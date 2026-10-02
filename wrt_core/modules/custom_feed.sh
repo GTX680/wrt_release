@@ -190,7 +190,7 @@ sync_tingreader_packages_to_feed_dir() {
     local tmp_dir
     local clone_args=(clone --depth 1 --filter=blob:none)
     local pkg
-    local tingreader_packages=(tingreader luci-app-tingreader)
+    local tingreader_packages=(luci-app-tingreader)
 
     tmp_dir=$(mktemp -d)
 
@@ -337,7 +337,7 @@ install_custom_feed() {
         open-app-filter luci-app-oaf lucky luci-app-lucky luci-app-easytier
         luci-app-emmc-health luci-app-wolultra luci-app-mini-diskmanager
         axonhub luci-app-axonhub gecoosac luci-app-gecoosac sing-box
-        tingreader luci-app-tingreader luci-app-velo5x0-fan
+        luci-app-tingreader luci-app-velo5x0-fan
     )
     local custom_feed_sources=()
     local missing_feed_dirs=()
