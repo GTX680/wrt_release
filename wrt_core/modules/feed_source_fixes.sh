@@ -163,7 +163,7 @@ with open(sys.argv[1], encoding="utf-8") as stream:
 
 candidates = [
     entry for entry in entries
-    if entry.get("is_dir") and re.fullmatch(r"[0-9]+(?:\.[0-9]+)+_lucky", entry.get("name", ""))
+    if entry.get("is_dir") and re.fullmatch(r"[0-9]+(?:\.[0-9]+)+_wanji_docker", entry.get("name", ""))
 ]
 if not candidates:
     raise SystemExit(1)
@@ -172,12 +172,12 @@ latest = max(candidates, key=lambda entry: entry.get("mod_time", ""))
 print(latest["name"])
 PY
     ) || {
-        echo "错误：$release_dir 中没有纯 Lucky 发布目录。" >&2
+        echo "错误：$release_dir 中没有 wanji_docker 发布目录。" >&2
         rm -f "$root_index" "$version_index" "$lucky_index"
         return 1
     }
 
-    local lucky_version="${lucky_release_dir%_lucky}"
+    local lucky_version="${lucky_release_dir%_wanji_docker}"
     if ! fetch_lucky_release_index "$release_base_url/$release_dir/$lucky_release_dir/" "$lucky_index"; then
         echo "错误：无法获取 Lucky 文件目录 $release_dir/$lucky_release_dir。" >&2
         rm -f "$root_index" "$version_index" "$lucky_index"
@@ -194,8 +194,8 @@ with open(sys.argv[1], encoding="utf-8") as stream:
 version = sys.argv[2]
 names = {entry.get("name") for entry in entries if not entry.get("is_dir")}
 required = {
-    f"lucky_{version}_Linux_arm64.tar.gz",
-    f"lucky_{version}_Linux_x86_64.tar.gz",
+    f"lucky_{version}_Linux_arm64_wanji_docker.tar.gz",
+    f"lucky_{version}_Linux_x86_64_wanji_docker.tar.gz",
 }
 missing = required - names
 if missing:
@@ -264,7 +264,7 @@ update_lucky() {
 
     local release_info
     if ! release_info=$(resolve_latest_lucky_release); then
-        echo "Warning: Lucky 最新版本解析失败，保留上游纯 Lucky 下载逻辑。" >&2
+        echo "Warning: Lucky 最新版本解析失败，保留上游 wanji_docker 下载逻辑。" >&2
         return 0
     fi
 
@@ -307,7 +307,7 @@ if prepare_end is None:
 
 download_line = (
     "\t[ ! -f $(PKG_BUILD_DIR)/$(PKG_NAME)_$(PKG_VERSION)_Linux_$(LUCKY_ARCH).tar.gz ] "
-    f"&& wget --tries=3 --timeout=30 {download_base_url}/$(PKG_NAME)_$(PKG_VERSION)_Linux_$(LUCKY_ARCH).tar.gz "
+    f"&& wget --tries=3 --timeout=30 {download_base_url}/$(PKG_NAME)_$(PKG_VERSION)_Linux_$(LUCKY_ARCH)_wanji_docker.tar.gz "
     "-O $(PKG_BUILD_DIR)/$(PKG_NAME)_$(PKG_VERSION)_Linux_$(LUCKY_ARCH).tar.gz\n"
 )
 
@@ -329,7 +329,7 @@ PY
         return 0
     fi
 
-    echo "lucky Makefile 已切换到纯 Lucky $lucky_version：$download_base_url"
+    echo "lucky Makefile 已切换到 wanji_docker 版 Lucky $lucky_version：$download_base_url"
 }
 
 
