@@ -87,6 +87,22 @@ PY
     echo "已禁用 APK 国内镜像替换，保留 OpenWrt 官方软件源。"
 }
 
+fix_autocore_mtwifi_temperature() {
+    local tempinfo="$BUILD_DIR/package/emortal/autocore/files/tempinfo"
+    local patch_file="$BASE_PATH/patches/autocore-tempinfo-mtwifi.patch"
+
+    [ -f "$tempinfo" ] && [ -f "$patch_file" ] || return 0
+    grep -q 'get_mtwifi_temp()' "$tempinfo" || return 0
+    grep -q 'local mtwifi_present=0' "$tempinfo" && return 0
+
+    if (cd "$BUILD_DIR" && patch -p1 -N -r - -s < "$patch_file"); then
+        echo "Applied autocore-tempinfo-mtwifi patch"
+    else
+        echo "ERROR: autocore-tempinfo-mtwifi.patch failed to apply cleanly" >&2
+        return 1
+    fi
+}
+
 fix_default_set() {
     # 注入默认主题、系统设置和目标平台通用补丁。
     if [ -d "$BUILD_DIR/feeds/luci/collections/" ]; then
@@ -109,6 +125,8 @@ fix_default_set() {
             echo "WARNING: autocore-tempinfo-hwmon.patch failed to apply cleanly - rebase needed" >&2
         fi
     fi
+
+    fix_autocore_mtwifi_temperature || return 1
 
     # rpcd: legacy iStoreOS backends (quickstartd) require values.token in
     # session data. Dropping the patch file into the package's patches/ dir

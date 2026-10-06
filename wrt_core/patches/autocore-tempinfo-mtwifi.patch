@@ -1,0 +1,22 @@
+--- a/package/emortal/autocore/files/tempinfo
++++ b/package/emortal/autocore/files/tempinfo
+@@ -9,6 +9,7 @@ get_mtwifi_temp() {
+ 	local flag
+ 	local ifname
+ 	local temp
++	local mtwifi_present=0
+ 	local mtwifi_vifs="ra0 rax0 rai0 ray0 rae0 raz0"
+ 	local result=""
+ 
+@@ -15,3 +16,4 @@ get_mtwifi_temp() {
+ 	for ifname in $mtwifi_vifs; do
+ 		if [ -f "/sys/class/net/${ifname}/flags" ]; then
++			mtwifi_present=1
+ 			flag="$(cat /sys/class/net/${ifname}/flags)"
+@@ -24,3 +26,5 @@ get_mtwifi_temp() {
+ 	done
+-	echo ${result:-unknown}
++	if [ "$mtwifi_present" -eq 1 ]; then
++		echo "${result:-unknown}"
++	fi
+ }
