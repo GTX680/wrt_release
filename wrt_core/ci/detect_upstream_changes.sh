@@ -13,7 +13,8 @@ LEGACY_FINGERPRINT_COMMITS=(
 MODELS=(
     MEDIATEK-WIFI-YES
     MEDIATEK-WIFI-NO
-    clx_s20p_immwrt
+    S20-WIFI-YES
+    S20-WIFI-NO
     jdcloud_ax6000_immwrt
 )
 

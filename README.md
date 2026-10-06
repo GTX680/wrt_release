@@ -80,19 +80,20 @@ GitHub Actions 的手动构建也提供 `add_fragments` 与 `remove_fragments` �
 
 - `MEDIATEK-WIFI-YES`
 - `MEDIATEK-WIFI-NO`
-- `clx_s20p_immwrt`
+- `S20-WIFI-YES`
+- `S20-WIFI-NO`
 - `jdcloud_ax6000_immwrt`
 
 检测指纹由上游分支提交、设备配置、公共配置、有效 fragments 和共享构建脚本共同生成。只有不存在成功构建标记时才调用 Release 工作流；构建或发布失败不会写入标记。首次启用监听时会为尚无成功标记的配置执行一次构建。
 
 云编译空间策略：
 
-- 四个自动任务按顺序执行，避免多个大型多设备任务同时发布和写缓存。
+- 五个监听配置沿用工作流的并发限制，避免过多大型多设备任务同时发布和写缓存。
 - Actions 缓存只保存 `.ccache`、host staging 和 toolchain staging，不保存目标 `build_dir`、目标 staging 或固件输出。
 - ccache 上限为 2 GiB；普通 Build 产物只保留 3 天。
-- `MEDIATEK-WIFI-YES/NO` 不再额外打包所有 kmod，避免在固件之外再次生成大型重复归档。
+- `MEDIATEK-WIFI-YES/NO` 和 `S20-WIFI-YES/NO` 不再额外打包所有 kmod，避免在固件之外再次生成大型重复归档。
 - Release 上传后执行 `make clean` 并删除目标构建目录、目标 staging、`bin` 和临时发布目录，但保留可复用的 host/toolchain 缓存。
-- 四个监听配置各保留最近 2 个 Release；每周维护任务清理 14 天未使用的普通缓存、30 天前的已完成工作流记录，并为每个配置保留最近 5 个成功指纹标记。
+- 五个监听配置各保留最近 2 个 Release；每周维护任务清理 14 天未使用的普通缓存、30 天前的已完成工作流记录，并为每个配置保留最近 5 个成功指纹标记。
 
 ## 5. 支持设备
 
@@ -103,7 +104,8 @@ GitHub Actions 的手动构建也提供 `add_fragments` 与 `remove_fragments` �
 | 京东云 | 雅典娜(02)、亚瑟(01)、太乙(07)、AX5(JDC版) | `jdcloud_ipq60xx_immwrt` |
 | 京东云 | 雅典娜(02)、亚瑟(01)、太乙(07)、AX5(JDC版) - LiBwrt | `jdcloud_ipq60xx_libwrt` |
 | 京东云 | 百里 / AX6000 | `jdcloud_ax6000_immwrt` |
-| CLX | S20P | `clx_s20p_immwrt` |
+| CLX | S20L、S20P（保留 WiFi） | `S20-WIFI-YES` |
+| CLX | S20L、S20M、S20P（移除 WiFi） | `S20-WIFI-NO` |
 | 阿里云 | AP8220 | `aliyun_ap8220_immwrt` |
 | 阿里云 | AP8220 - LiBwrt | `aliyun_ap8220_libwrt` |
 | Linksys | MX4200v1、MX4200v2、MX4300 | `linksys_mx4x00_immwrt` |
@@ -128,6 +130,8 @@ GitHub Actions 的手动构建也提供 `add_fragments` 与 `remove_fragments` �
 ./build.sh jdcloud_ipq60xx_immwrt
 ./build.sh aliyun_ap8220_libwrt
 ./build.sh redmi_ax6_libwrt container
+./build.sh S20-WIFI-YES
+./build.sh S20-WIFI-NO config_preview
 ```
 
 ## 6. 配置来源
@@ -139,6 +143,8 @@ GitHub Actions 的手动构建也提供 `add_fragments` 与 `remove_fragments` �
 
 不同设备会使用不同上游源码，例如 `VIKINGYFY/immortalwrt`、`immortalwrt/immortalwrt`、`LiBwrt/openwrt-6.x`、`padavanonly/immortalwrt-mt798x` 或本仓库维护的特定分支。`BUILD_TARGET_SDK` 未配置时，容器构建默认使用 `immortalwrt/sdk:openwrt-25.12`。
 
+`S20-WIFI-YES` 和 `S20-WIFI-NO` 均使用 `dqsq2e2/immortalwrt-mt798x-rebase` 的 `s20` 分支，分别构建 2 个保留 WiFi 的型号（S20L、S20P）和 3 个移除 WiFi 的型号（S20L、S20M、S20P）。
+
 构建时会按顺序组合配置：
 
 1. 设备专用 `.config`
@@ -147,13 +153,13 @@ GitHub Actions 的手动构建也提供 `add_fragments` 与 `remove_fragments` �
 
 默认片段由 `compilecfg/*.ini` 的 `CONFIG_FRAGMENTS` 指定：
 
-- 所有设备默认包含 `proxy`。
+- `proxy` 选择代理相关软件包，是否默认包含以各设备的 `CONFIG_FRAGMENTS` 为准。
 - IPQ60xx / IPQ807x 设备默认额外包含 `nss`。
-- 只有已显式选择 Dockerman 或明确适合运行 Docker 的设备默认包含 `docker_deps`，用于预置手动安装 Docker 所需的运行依赖，避免 NAND 空间紧张或无 USB 设备被默认加入 Docker 依赖。
+- 只有已显式选择 Dockerman 或明确适合运行 Docker 的设备默认包含 `docker_deps`，统一选择 `luci-app-dockerman`、`docker-compose` 及运行依赖，避免 NAND 空间紧张或无 USB 设备被默认加入 Docker 软件包。
 
 `ADD_CONFIG_FRAGMENTS` 会在默认片段后追加，`REMOVE_CONFIG_FRAGMENTS` 会从最终片段中移除对应配置片段。移除只表示“不追加这个 fragment”，不会反向修改设备 `.config` 或 `compile_base.config` 中已经写明的配置。
 
-Dockerman 源码更新和 Docker nftables 兼容补丁同样以最终生效的 `docker_deps` 片段为开关：包含该片段时执行，不包含时跳过。因此通过 `ADD_CONFIG_FRAGMENTS=docker_deps` 可以临时启用补丁，通过 `REMOVE_CONFIG_FRAGMENTS=docker_deps` 可以临时禁用补丁。
+Dockerman 源码更新和 Docker nftables 兼容补丁同样以最终生效的 `docker_deps` 片段为开关：包含该片段时执行，不包含时跳过。因此通过 `ADD_CONFIG_FRAGMENTS=docker_deps` 可以临时加入 Docker 软件包并启用补丁，通过 `REMOVE_CONFIG_FRAGMENTS=docker_deps` 可以不再追加 Docker 软件包并禁用补丁。单独调用 `wrt_core/update.sh` 时，Docker 更新和补丁默认关闭，由构建入口传入片段解析结果。
 
 ## 7. 三方插件
 
@@ -178,7 +184,7 @@ https://github.com/kenzok8/small-package.git
 - `wrt_core/deconfig/fragments/`：可组合配置片段。
 - `wrt_core/modules/`：模块化脚本，包括仓库准备、网络重试、feeds/custom_feed、源码修正、LuCI 修正、服务修正、验证、Docker、CUPS 等静态职责模块。
 - `wrt_core/patches/`：补丁、默认设置、Wi-Fi 初始化、NSS 诊断、PBR 规则和其他构建时注入文件。
-- `.github/workflows/upstream_watch.yml`：定时检测四个重点配置的上游源码变更并自动发布。
+- `.github/workflows/upstream_watch.yml`：定时检测五个重点配置的上游源码变更并自动发布。
 - `.github/workflows/ci_maintenance.yml`：定期清理旧缓存、旧工作流记录和旧 Release。
 
 ## 9. OAF（应用过滤）功能使用说明

@@ -13,7 +13,8 @@ on:
           - aliyun_ap8220_immwrt
           - aliyun_ap8220_libwrt
           - cmcc_rax3000m_immwrt
-          - clx_s20p_immwrt
+          - S20-WIFI-YES
+          - S20-WIFI-NO
           - gemtek_w1701k_immwrt
           - jdcloud_ax6000_immwrt
           - jdcloud_ipq60xx_immwrt
@@ -244,7 +245,7 @@ jobs:
           echo "===================================================="
 
       - name: Package Kmods
-        if: ${{ !startsWith(inputs.model, 'MEDIATEK-WIFI-') }}
+        if: ${{ !startsWith(inputs.model, 'MEDIATEK-WIFI-') && inputs.model != 'S20-WIFI-YES' && inputs.model != 'S20-WIFI-NO' }}
         run: |
           if [ ! -d "./action_build/bin" ]; then
             echo "kmod source directory not found: ./action_build/bin" >&2
@@ -326,7 +327,7 @@ jobs:
           body_path: ./release_body.txt
 
       - name: Prune Old Monitored Releases
-        if: ${{ contains(fromJSON('["MEDIATEK-WIFI-YES","MEDIATEK-WIFI-NO","clx_s20p_immwrt","jdcloud_ax6000_immwrt"]'), inputs.model) }}
+        if: ${{ contains(fromJSON('["MEDIATEK-WIFI-YES","MEDIATEK-WIFI-NO","S20-WIFI-YES","S20-WIFI-NO","jdcloud_ax6000_immwrt"]'), inputs.model) }}
         env:
           MODEL: ${{ inputs.model }}
         run: |
