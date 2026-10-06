@@ -264,7 +264,7 @@ update_lucky() {
 
     local release_info
     if ! release_info=$(resolve_latest_lucky_release); then
-        echo "Warning: Lucky 最新版本解析失败，保留上游 wanji_docker 下载逻辑。" >&2
+        echo "Warning: Lucky 最新版本解析失败，保留上游下载配置。" >&2
         return 0
     fi
 
@@ -277,7 +277,6 @@ update_lucky() {
     echo "正在更新 lucky Makefile: $release_dir/$lucky_release_dir..."
     if ! python3 - "$makefile_path" "$lucky_version" "$download_base_url" <<'PY'
 import pathlib
-import re
 import sys
 
 makefile = pathlib.Path(sys.argv[1])
@@ -285,42 +284,19 @@ version = sys.argv[2]
 download_base_url = sys.argv[3].rstrip("/")
 lines = makefile.read_text(encoding="utf-8").splitlines(keepends=True)
 
-version_count = 0
-for index, line in enumerate(lines):
-    if line.startswith("PKG_VERSION:="):
-        lines[index] = f"PKG_VERSION:={version}\n"
-        version_count += 1
-
-if version_count != 1:
-    raise SystemExit("Lucky Makefile 中未找到唯一的 PKG_VERSION")
-
-prepare_start = next((index for index, line in enumerate(lines) if line.strip() == "define Build/Prepare"), None)
-if prepare_start is None:
-    raise SystemExit("Lucky Makefile 中未找到 Build/Prepare")
-
-prepare_end = next(
-    (index for index in range(prepare_start + 1, len(lines)) if lines[index].strip() == "endef"),
-    None,
-)
-if prepare_end is None:
-    raise SystemExit("Lucky Makefile 的 Build/Prepare 未闭合")
-
-download_line = (
-    "\t[ ! -f $(PKG_BUILD_DIR)/$(PKG_NAME)_$(PKG_VERSION)_Linux_$(LUCKY_ARCH).tar.gz ] "
-    f"&& wget --tries=3 --timeout=30 {download_base_url}/$(PKG_NAME)_$(PKG_VERSION)_Linux_$(LUCKY_ARCH)_wanji_docker.tar.gz "
-    "-O $(PKG_BUILD_DIR)/$(PKG_NAME)_$(PKG_VERSION)_Linux_$(LUCKY_ARCH).tar.gz\n"
-)
-
-download_indexes = [
-    index for index in range(prepare_start + 1, prepare_end)
-    if "wget " in lines[index] or "wrt_core/patches/lucky_" in lines[index]
-]
-if download_indexes:
-    lines[download_indexes[0]] = download_line
-    for index in reversed(download_indexes[1:]):
-        del lines[index]
-else:
-    lines.insert(prepare_start + 1, download_line)
+assignments = {
+    "PKG_VERSION": version,
+    "PKG_SOURCE": "$(PKG_NAME)_$(PKG_VERSION)_Linux_$(LUCKY_ARCH)_wanji_docker.tar.gz",
+    "PKG_SOURCE_URL": download_base_url,
+}
+for name, value in assignments.items():
+    indexes = [
+        index for index, line in enumerate(lines)
+        if line.startswith(f"{name}:=")
+    ]
+    if len(indexes) != 1:
+        raise SystemExit(f"Lucky Makefile 中未找到唯一的 {name}")
+    lines[indexes[0]] = f"{name}:={value}\n"
 
 makefile.write_text("".join(lines), encoding="utf-8")
 PY
