@@ -13,11 +13,13 @@ on:
       - "wrt_core/deconfig/S20-WIFI-YES.config"
       - "wrt_core/deconfig/S20-WIFI-NO.config"
       - "wrt_core/deconfig/jdcloud_ax6000_immwrt.config"
+      - "wrt_core/deconfig/jdcloud_ax6000_immwrt_daed.config"
       - "wrt_core/compilecfg/MEDIATEK-WIFI-YES.ini"
       - "wrt_core/compilecfg/MEDIATEK-WIFI-NO.ini"
       - "wrt_core/compilecfg/S20-WIFI-YES.ini"
       - "wrt_core/compilecfg/S20-WIFI-NO.ini"
       - "wrt_core/compilecfg/jdcloud_ax6000_immwrt.ini"
+      - "wrt_core/compilecfg/jdcloud_ax6000_immwrt_daed.ini"
       - "wrt_core/deconfig/compile_base.config"
       - "wrt_core/deconfig/fragments/**"
       - "wrt_core/modules/**"
@@ -42,6 +44,7 @@ on:
           - S20-WIFI-YES
           - S20-WIFI-NO
           - jdcloud_ax6000_immwrt
+          - jdcloud_ax6000_immwrt_daed
       force_build:
         description: Build even when the fingerprint was already released
         required: true

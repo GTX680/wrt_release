@@ -25,6 +25,9 @@ remove_unwanted_packages() {
             "luci-app-aurora-config" "luci-theme-aurora"
         )
     fi
+    if [[ ${DAED_PACKAGES_ENABLED:-0} == "1" ]]; then
+        luci_packages+=("luci-app-daede")
+    fi
     for pkg in "${luci_packages[@]}"; do
         if [[ -d ./feeds/luci/applications/$pkg ]]; then
             \rm -rf ./feeds/luci/applications/$pkg

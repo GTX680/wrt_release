@@ -295,6 +295,23 @@ fix_mini_diskmanager_menu() {
 }
 
 
+fix_daede_luci_host_depends() {
+    local makefile_path="$1/Makefile"
+
+    if [[ ! -f $makefile_path ]]; then
+        echo "Error: luci-app-daede Makefile not found: $makefile_path" >&2
+        return 1
+    fi
+    if grep -Eq '^PKG_BUILD_DEPENDS[[:space:]:+?]*=.*luci-base/host' "$makefile_path"; then
+        return 0
+    fi
+
+    # The standalone package invokes po2lmo without including luci.mk.
+    sed -i '/^include $(INCLUDE_DIR)\/package.mk$/i PKG_BUILD_DEPENDS+=luci-base/host' "$makefile_path"
+    grep -Eq '^PKG_BUILD_DEPENDS[[:space:]:+?]*=.*luci-base/host' "$makefile_path"
+}
+
+
 register_local_feed_source() {
     local custom_feed_dir="$1"
     local feeds_path="$2"
@@ -374,6 +391,14 @@ install_custom_feed() {
         "nikkinikki-org/OpenWrt-nikki|https://github.com/nikkinikki-org/OpenWrt-nikki.git|main|nikki luci-app-nikki mihomo-meta"
     )
 
+    if [[ ${DAED_PACKAGES_ENABLED:-0} == "1" ]]; then
+        # Keep sibling directories: luci-app-daede installs defaults from ../dae and ../daed.
+        custom_feed_sources+=(
+            "kenzok8/openwrt-daede|https://github.com/kenzok8/openwrt-daede.git|main|dae daed luci-app-daede vmlinux-btf"
+        )
+        required_feed_dirs+=(dae daed luci-app-daede vmlinux-btf)
+    fi
+
     feeds_path=$(get_feeds_path)
     custom_feed_name=$(get_custom_feed_name)
     custom_feed_dir=$(get_custom_feed_source_dir)
@@ -443,6 +468,10 @@ install_custom_feed() {
             return 1
         fi
     done
+
+    if [[ ${DAED_PACKAGES_ENABLED:-0} == "1" ]]; then
+        fix_daede_luci_host_depends "$custom_feed_dir/luci-app-daede" || return 1
+    fi
 
     if ! verify_istore_apk_support "$custom_feed_dir/luci-app-store"; then
         rm -rf "$custom_feed_dir"

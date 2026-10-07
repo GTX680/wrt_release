@@ -83,17 +83,18 @@ GitHub Actions 的手动构建也提供 `add_fragments` 与 `remove_fragments` �
 - `S20-WIFI-YES`
 - `S20-WIFI-NO`
 - `jdcloud_ax6000_immwrt`
+- `jdcloud_ax6000_immwrt_daed`
 
 检测指纹由上游分支提交、设备配置、公共配置、有效 fragments 和共享构建脚本共同生成。只有不存在成功构建标记时才调用 Release 工作流；构建或发布失败不会写入标记。首次启用监听时会为尚无成功标记的配置执行一次构建。
 
 云编译空间策略：
 
-- 五个监听配置沿用工作流的并发限制，避免过多大型多设备任务同时发布和写缓存。
+- 监听配置沿用工作流的并发限制，避免过多大型多设备任务同时发布和写缓存。
 - Actions 缓存只保存 `.ccache`、host staging 和 toolchain staging，不保存目标 `build_dir`、目标 staging 或固件输出。
 - ccache 上限为 2 GiB；普通 Build 产物只保留 3 天。
 - `MEDIATEK-WIFI-YES/NO` 和 `S20-WIFI-YES/NO` 不再额外打包所有 kmod，避免在固件之外再次生成大型重复归档。
 - Release 上传后执行 `make clean` 并删除目标构建目录、目标 staging、`bin` 和临时发布目录，但保留可复用的 host/toolchain 缓存。
-- 五个监听配置各保留最近 2 个 Release；每周维护任务清理 14 天未使用的普通缓存、30 天前的已完成工作流记录，并为每个配置保留最近 5 个成功指纹标记。
+- 监听配置各保留最近 2 个 Release；维护任务清理过期普通缓存和已完成的工作流记录，并为每个配置保留最近 5 个成功指纹标记。
 
 ## 5. 支持设备
 
@@ -104,6 +105,7 @@ GitHub Actions 的手动构建也提供 `add_fragments` 与 `remove_fragments` �
 | 京东云 | 雅典娜(02)、亚瑟(01)、太乙(07)、AX5(JDC版) | `jdcloud_ipq60xx_immwrt` |
 | 京东云 | 雅典娜(02)、亚瑟(01)、太乙(07)、AX5(JDC版) - LiBwrt | `jdcloud_ipq60xx_libwrt` |
 | 京东云 | 百里 / AX6000 | `jdcloud_ax6000_immwrt` |
+| 京东云 | 百里 / AX6000 - Linux 6.18 / daed | `jdcloud_ax6000_immwrt_daed` |
 | CLX | S20L、S20P（保留 WiFi） | `S20-WIFI-YES` |
 | CLX | S20L、S20M、S20P（移除 WiFi） | `S20-WIFI-NO` |
 | 阿里云 | AP8220 | `aliyun_ap8220_immwrt` |
@@ -132,6 +134,7 @@ GitHub Actions 的手动构建也提供 `add_fragments` 与 `remove_fragments` �
 ./build.sh redmi_ax6_libwrt container
 ./build.sh S20-WIFI-YES
 ./build.sh S20-WIFI-NO config_preview
+./build.sh jdcloud_ax6000_immwrt_daed
 ```
 
 ## 6. 配置来源
@@ -145,6 +148,12 @@ GitHub Actions 的手动构建也提供 `add_fragments` 与 `remove_fragments` �
 
 `S20-WIFI-YES` 和 `S20-WIFI-NO` 均使用 `dqsq2e2/immortalwrt-mt798x-rebase` 的 `s20` 分支，分别构建 2 个保留 WiFi 的型号（S20L、S20P）和 3 个移除 WiFi 的型号（S20L、S20M、S20P）。
 
+`jdcloud_ax6000_immwrt_daed` 使用 `VIKINGYFY/immortalwrt` 的 `owrt` 分支，目标为 `jdcloud_re-cp-03`，通过 `EXPECTED_KERNEL=6.18` 检查内核主次版本，构建目录为 `immortalwrt-daed/`。原来的 `jdcloud_ax6000_immwrt` 继续使用 6.12 厂商驱动，两者独立保留。
+
+此配置的应用选择沿用 `jdcloud_ax6000_immwrt.config` 与公共配置，将厂商 WiFi/HNAT 组件换为 mac80211 WiFi 和原生 PPE/nft flowtable，去掉只适用于厂商驱动的 eQoS/Turbo ACC 插件，通过 LuCI 防火墙设置管理流量卸载，并追加 `daed` 片段。参考 `darkrain88/daed-immWRT-CI` 的来源，从 `kenzok8/openwrt-daede` 同步 dae、daed、luci-app-daede 和 vmlinux-btf 源码；默认仅预装内置 dae 核心的 daed 与中文 LuCI 管理界面，不重复预装独立 dae 服务。BTF 直接编入本机内核，不依赖外置 BTF 文件。daed 保留软件包默认的未启用状态，完成订阅及分流配置后再启动；不预置旁路由 IP、上游网关或订阅。
+
+此配置还预装 `luci-app-fullconenat-sonic`，使用源码内置的 Sonic 全锥 NAT 管理界面，不混用旧版独立 fullconenat 内核模块。
+
 构建时会按顺序组合配置：
 
 1. 设备专用 `.config`
@@ -154,6 +163,7 @@ GitHub Actions 的手动构建也提供 `add_fragments` 与 `remove_fragments` �
 默认片段由 `compilecfg/*.ini` 的 `CONFIG_FRAGMENTS` 指定：
 
 - `proxy` 选择代理相关软件包，是否默认包含以各设备的 `CONFIG_FRAGMENTS` 为准。
+- `daed` 选择 daed、luci-app-daede 和 eBPF/BTF 依赖，并控制对应 custom_feed 源码同步与配置校验；默认仅由 `jdcloud_ax6000_immwrt_daed` 使用。
 - IPQ60xx / IPQ807x 设备默认额外包含 `nss`。
 - 只有已显式选择 Dockerman 或明确适合运行 Docker 的设备默认包含 `docker_deps`，统一选择 `luci-app-dockerman`、`docker-compose` 及运行依赖，避免 NAND 空间紧张或无 USB 设备被默认加入 Docker 软件包。
 

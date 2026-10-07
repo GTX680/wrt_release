@@ -26,11 +26,20 @@ GOLANG_BRANCH="26.x"
 THEME_SET="argon"
 LAN_ADDR="192.168.1.1"
 DOCKER_STACK_PATCHES_ENABLED=${DOCKER_STACK_PATCHES_ENABLED:-0}
+DAED_PACKAGES_ENABLED=${DAED_PACKAGES_ENABLED:-0}
 
 case "$DOCKER_STACK_PATCHES_ENABLED" in
     0|1) ;;
     *)
         echo "Error: DOCKER_STACK_PATCHES_ENABLED must be 0 or 1, got: $DOCKER_STACK_PATCHES_ENABLED" >&2
+        exit 1
+        ;;
+esac
+
+case "$DAED_PACKAGES_ENABLED" in
+    0|1) ;;
+    *)
+        echo "Error: DAED_PACKAGES_ENABLED must be 0 or 1, got: $DAED_PACKAGES_ENABLED" >&2
         exit 1
         ;;
 esac
