@@ -401,7 +401,7 @@ install_custom_feed() {
 
     if [[ ${HONK_PACKAGES_ENABLED:-0} == "1" ]]; then
         custom_feed_sources+=(
-            "kwrum1/openwrt-honk|https://github.com/kwrum1/openwrt-honk.git|main|honk luci-app-honk"
+            "kenzok8/openwrt-honk|https://github.com/kenzok8/openwrt-honk.git|main|honk luci-app-honk"
             "kenzok8/wall|https://github.com/kenzok8/wall.git|main|v2ray-geodata"
         )
         required_feed_dirs+=(honk luci-app-honk)

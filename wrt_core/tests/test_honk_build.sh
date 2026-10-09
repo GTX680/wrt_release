@@ -11,6 +11,10 @@ source <(sed 's/\r$//' "$BASE_PATH/modules/feed_source_fixes.sh")
 test_dir=$(mktemp -d)
 trap 'rm -rf -- "$test_dir"' EXIT
 
+grep -Fq 'kenzok8/openwrt-honk|https://github.com/kenzok8/openwrt-honk.git|main|honk luci-app-honk' \
+    "$BASE_PATH/modules/custom_feed.sh"
+echo "PASS: Honk packages use the kenzok8 source"
+
 preview=$(cd "$REPO_ROOT" && bash <(sed 's/\r$//' build.sh) "$MODEL" config_preview)
 grep -q 'Effective fragments: honk$' <<< "$preview"
 grep -q 'Honk packages: enabled$' <<< "$preview"
