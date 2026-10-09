@@ -312,6 +312,69 @@ fix_daede_luci_host_depends() {
 }
 
 
+prepare_honk_release() {
+    local package_dir="$1"
+    local release_url="https://github.com/kenzok8/openwrt-honk/releases/download/staging"
+    local tmp_dir
+    local filename
+
+    tmp_dir=$(mktemp -d)
+    # These generated build inputs are published as release assets, not in Git.
+    for filename in generated-stage.mk generated-provenance.json; do
+        if ! curl_retry -fsSL -o "$tmp_dir/$filename" "$release_url/$filename"; then
+            echo "Error: failed to fetch Honk release metadata: $filename" >&2
+            rm -rf "$tmp_dir"
+            return 1
+        fi
+    done
+
+    if ! python3 - "$package_dir" "$tmp_dir" <<'PY'
+import json
+import pathlib
+import re
+import shutil
+import sys
+
+package_dir = pathlib.Path(sys.argv[1])
+metadata_dir = pathlib.Path(sys.argv[2])
+makefile = (package_dir / "Makefile").read_text(encoding="utf-8")
+revision = re.search(r"^CORE_COMMIT:=([0-9a-f]{40})\s*$", makefile, re.MULTILINE)
+if revision is None:
+    raise SystemExit("Error: Honk Makefile has no pinned CORE_COMMIT")
+revision = revision[1]
+
+stage = (metadata_dir / "generated-stage.mk").read_text(encoding="utf-8")
+assignments = {}
+for line in stage.splitlines():
+    if not line.strip() or line.startswith("#"):
+        continue
+    match = re.fullmatch(r"(HONK_(?:ASSET|HASH)_(?:X86_64|AARCH64|ARMV7)):=(\S+)", line)
+    if match is None or match[1] in assignments:
+        raise SystemExit("Error: invalid Honk release stage manifest")
+    assignments[match[1]] = match[2]
+
+for arch, suffix in (("X86_64", "x86_64"), ("AARCH64", "aarch64"), ("ARMV7", "armv7")):
+    if assignments.get(f"HONK_ASSET_{arch}") != f"honk-core-{revision}-{suffix}.tar.gz":
+        raise SystemExit(f"Error: Honk {arch} release does not match CORE_COMMIT")
+    if not re.fullmatch(r"[0-9a-f]{64}", assignments.get(f"HONK_HASH_{arch}", "")):
+        raise SystemExit(f"Error: Honk {arch} release has no valid SHA256")
+
+provenance = json.loads((metadata_dir / "generated-provenance.json").read_text(encoding="utf-8"))
+if not isinstance(provenance, dict) or provenance.get("core", {}).get("commit") != revision:
+    raise SystemExit("Error: Honk release provenance does not match CORE_COMMIT")
+
+for filename in ("generated-stage.mk", "generated-provenance.json"):
+    shutil.copyfile(metadata_dir / filename, package_dir / filename)
+PY
+    then
+        rm -rf "$tmp_dir"
+        return 1
+    fi
+
+    rm -rf "$tmp_dir"
+}
+
+
 register_local_feed_source() {
     local custom_feed_dir="$1"
     local feeds_path="$2"
@@ -479,6 +542,9 @@ install_custom_feed() {
 
     if [[ ${DAED_PACKAGES_ENABLED:-0} == "1" ]]; then
         fix_daede_luci_host_depends "$custom_feed_dir/luci-app-daede" || return 1
+    fi
+    if [[ ${HONK_PACKAGES_ENABLED:-0} == "1" ]]; then
+        prepare_honk_release "$custom_feed_dir/honk" || return 1
     fi
 
     if ! verify_istore_apk_support "$custom_feed_dir/luci-app-store"; then

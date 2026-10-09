@@ -150,7 +150,7 @@ GitHub Actions 的手动构建也提供 `add_fragments` 与 `remove_fragments` �
 
 `jdcloud_ax6000_immwrt_honk` 使用 `VIKINGYFY/immortalwrt` 的 `owrt` 分支，目标为 `jdcloud_re-cp-03`，通过 `EXPECTED_KERNEL=6.18` 检查内核主次版本，构建目录为 `immortalwrt-honk/`。原来的 `jdcloud_ax6000_immwrt` 继续使用 6.12 厂商驱动，两者独立保留。
 
-此配置的应用选择沿用 `jdcloud_ax6000_immwrt.config` 与公共配置，将厂商 WiFi/HNAT 组件换为 mac80211 WiFi 和原生 PPE/nft flowtable，去掉只适用于厂商驱动的 eQoS/Turbo ACC 插件，通过 LuCI 防火墙设置管理流量卸载，并追加 `honk` 片段。参考 `kwrum1/honk-ImmortalWRT-CI`，从 `kenzok8/openwrt-honk` 同步 honk 核心与 luci-app-honk（含 Doona 界面），从 `kenzok8/wall` 同步 v2ray-geodata，为 Honk 提供 GeoIP/GeoSite 数据。核心使用软件包指定的 AArch64 musl 发行包。BTF 直接编入本机内核，不依赖外置 BTF 文件。Honk 保留软件包默认的未初始化、未启用状态，刷机后在「服务 → Honk」中初始化并配置订阅和分流后启动；不预置旁路由 IP、上游网关或订阅。
+此配置的应用选择沿用 `jdcloud_ax6000_immwrt.config` 与公共配置，将厂商 WiFi/HNAT 组件换为 mac80211 WiFi 和原生 PPE/nft flowtable，去掉只适用于厂商驱动的 eQoS/Turbo ACC 插件，通过 LuCI 防火墙设置管理流量卸载，并追加 `honk` 片段。参考 `kwrum1/honk-ImmortalWRT-CI`，从 `kenzok8/openwrt-honk` 同步 honk 核心与 luci-app-honk（含 Doona 界面），从 `kenzok8/wall` 同步 v2ray-geodata，为 Honk 提供 GeoIP/GeoSite 数据。核心使用软件包指定的 AArch64 musl 发行包；构建前从同仓库的 `staging` 发布同步 `generated-stage.mk` 和 `generated-provenance.json`，校验核心提交一致并使用发布清单中的 SHA256。BTF 直接编入本机内核，不依赖外置 BTF 文件。Honk 保留软件包默认的未初始化、未启用状态，刷机后在「服务 → Honk」中初始化并配置订阅和分流后启动；不预置旁路由 IP、上游网关或订阅。
 
 此配置还预装 `luci-app-fullconenat-sonic`，使用源码内置的 Sonic 全锥 NAT 管理界面，不混用旧版独立 fullconenat 内核模块。
 
