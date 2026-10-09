@@ -312,6 +312,29 @@ fix_daede_luci_host_depends() {
 }
 
 
+fix_honk_luci_vendor_install() {
+    # Upstream removed the vendor files but still installs the optional directory.
+    python3 - "$1/Makefile" <<'PY'
+import pathlib
+import sys
+
+makefile = pathlib.Path(sys.argv[1])
+contents = makefile.read_text(encoding="utf-8")
+source = "./htdocs/luci-static/resources/view/honk/vendor/*"
+destination = "$(1)/www/luci-static/resources/view/honk/vendor"
+for recipe in (
+    f"$(INSTALL_DIR) {destination}",
+    f"$(INSTALL_DATA) {source} {destination}/",
+):
+    contents = contents.replace(
+        f"\t{recipe}\n",
+        f"\t$(if $(wildcard {source}),{recipe})\n",
+    )
+makefile.write_text(contents, encoding="utf-8")
+PY
+}
+
+
 prepare_honk_release() {
     local package_dir="$1"
     local release_url="https://github.com/kenzok8/openwrt-honk/releases/download/staging"
@@ -545,6 +568,7 @@ install_custom_feed() {
     fi
     if [[ ${HONK_PACKAGES_ENABLED:-0} == "1" ]]; then
         prepare_honk_release "$custom_feed_dir/honk" || return 1
+        fix_honk_luci_vendor_install "$custom_feed_dir/luci-app-honk" || return 1
     fi
 
     if ! verify_istore_apk_support "$custom_feed_dir/luci-app-store"; then
