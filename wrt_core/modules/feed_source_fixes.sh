@@ -28,6 +28,10 @@ remove_unwanted_packages() {
     if [[ ${DAED_PACKAGES_ENABLED:-0} == "1" ]]; then
         luci_packages+=("luci-app-daede")
     fi
+    if [[ ${HONK_PACKAGES_ENABLED:-0} == "1" ]]; then
+        luci_packages+=("luci-app-honk")
+        packages_net+=("honk")
+    fi
     for pkg in "${luci_packages[@]}"; do
         if [[ -d ./feeds/luci/applications/$pkg ]]; then
             \rm -rf ./feeds/luci/applications/$pkg

@@ -83,7 +83,7 @@ GitHub Actions 的手动构建也提供 `add_fragments` 与 `remove_fragments` �
 - `S20-WIFI-YES`
 - `S20-WIFI-NO`
 - `jdcloud_ax6000_immwrt`
-- `jdcloud_ax6000_immwrt_daed`
+- `jdcloud_ax6000_immwrt_honk`
 
 检测指纹由上游分支提交、设备配置、公共配置、有效 fragments 和共享构建脚本共同生成。只有不存在成功构建标记时才调用 Release 工作流；构建或发布失败不会写入标记。首次启用监听时会为尚无成功标记的配置执行一次构建。
 
@@ -105,7 +105,7 @@ GitHub Actions 的手动构建也提供 `add_fragments` 与 `remove_fragments` �
 | 京东云 | 雅典娜(02)、亚瑟(01)、太乙(07)、AX5(JDC版) | `jdcloud_ipq60xx_immwrt` |
 | 京东云 | 雅典娜(02)、亚瑟(01)、太乙(07)、AX5(JDC版) - LiBwrt | `jdcloud_ipq60xx_libwrt` |
 | 京东云 | 百里 / AX6000 | `jdcloud_ax6000_immwrt` |
-| 京东云 | 百里 / AX6000 - Linux 6.18 / daed | `jdcloud_ax6000_immwrt_daed` |
+| 京东云 | 百里 / AX6000 - Linux 6.18 / Honk | `jdcloud_ax6000_immwrt_honk` |
 | CLX | S20L、S20P（保留 WiFi） | `S20-WIFI-YES` |
 | CLX | S20L、S20M、S20P（移除 WiFi） | `S20-WIFI-NO` |
 | 阿里云 | AP8220 | `aliyun_ap8220_immwrt` |
@@ -134,7 +134,7 @@ GitHub Actions 的手动构建也提供 `add_fragments` 与 `remove_fragments` �
 ./build.sh redmi_ax6_libwrt container
 ./build.sh S20-WIFI-YES
 ./build.sh S20-WIFI-NO config_preview
-./build.sh jdcloud_ax6000_immwrt_daed
+./build.sh jdcloud_ax6000_immwrt_honk
 ```
 
 ## 6. 配置来源
@@ -148,9 +148,9 @@ GitHub Actions 的手动构建也提供 `add_fragments` 与 `remove_fragments` �
 
 `S20-WIFI-YES` 和 `S20-WIFI-NO` 均使用 `dqsq2e2/immortalwrt-mt798x-rebase` 的 `s20` 分支，分别构建 2 个保留 WiFi 的型号（S20L、S20P）和 3 个移除 WiFi 的型号（S20L、S20M、S20P）。
 
-`jdcloud_ax6000_immwrt_daed` 使用 `VIKINGYFY/immortalwrt` 的 `owrt` 分支，目标为 `jdcloud_re-cp-03`，通过 `EXPECTED_KERNEL=6.18` 检查内核主次版本，构建目录为 `immortalwrt-daed/`。原来的 `jdcloud_ax6000_immwrt` 继续使用 6.12 厂商驱动，两者独立保留。
+`jdcloud_ax6000_immwrt_honk` 使用 `VIKINGYFY/immortalwrt` 的 `owrt` 分支，目标为 `jdcloud_re-cp-03`，通过 `EXPECTED_KERNEL=6.18` 检查内核主次版本，构建目录为 `immortalwrt-honk/`。原来的 `jdcloud_ax6000_immwrt` 继续使用 6.12 厂商驱动，两者独立保留。
 
-此配置的应用选择沿用 `jdcloud_ax6000_immwrt.config` 与公共配置，将厂商 WiFi/HNAT 组件换为 mac80211 WiFi 和原生 PPE/nft flowtable，去掉只适用于厂商驱动的 eQoS/Turbo ACC 插件，通过 LuCI 防火墙设置管理流量卸载，并追加 `daed` 片段。参考 `darkrain88/daed-immWRT-CI` 的来源，从 `kenzok8/openwrt-daede` 同步 dae、daed、luci-app-daede 和 vmlinux-btf 源码；默认仅预装内置 dae 核心的 daed 与中文 LuCI 管理界面，不重复预装独立 dae 服务。BTF 直接编入本机内核，不依赖外置 BTF 文件。daed 保留软件包默认的未启用状态，完成订阅及分流配置后再启动；不预置旁路由 IP、上游网关或订阅。
+此配置的应用选择沿用 `jdcloud_ax6000_immwrt.config` 与公共配置，将厂商 WiFi/HNAT 组件换为 mac80211 WiFi 和原生 PPE/nft flowtable，去掉只适用于厂商驱动的 eQoS/Turbo ACC 插件，通过 LuCI 防火墙设置管理流量卸载，并追加 `honk` 片段。参考 `kwrum1/honk-ImmortalWRT-CI`，从 `kwrum1/openwrt-honk` 同步 honk 核心与 luci-app-honk（含 Doona 界面），从 `kenzok8/wall` 同步 v2ray-geodata，为 Honk 提供 GeoIP/GeoSite 数据。核心使用软件包指定且校验 SHA256 的 AArch64 musl 发行包。BTF 直接编入本机内核，不依赖外置 BTF 文件。Honk 保留软件包默认的未初始化、未启用状态，刷机后在「服务 → Honk」中初始化并配置订阅和分流后启动；不预置旁路由 IP、上游网关或订阅。
 
 此配置还预装 `luci-app-fullconenat-sonic`，使用源码内置的 Sonic 全锥 NAT 管理界面，不混用旧版独立 fullconenat 内核模块。
 
@@ -163,7 +163,8 @@ GitHub Actions 的手动构建也提供 `add_fragments` 与 `remove_fragments` �
 默认片段由 `compilecfg/*.ini` 的 `CONFIG_FRAGMENTS` 指定：
 
 - `proxy` 选择代理相关软件包，是否默认包含以各设备的 `CONFIG_FRAGMENTS` 为准。
-- `daed` 选择 daed、luci-app-daede 和 eBPF/BTF 依赖，并控制对应 custom_feed 源码同步与配置校验；默认仅由 `jdcloud_ax6000_immwrt_daed` 使用。
+- `honk` 选择 honk、luci-app-honk、GeoIP/GeoSite 数据和 eBPF/BTF 依赖，并控制对应 custom_feed 源码同步与配置校验；默认由 `jdcloud_ax6000_immwrt_honk` 使用。可通过 `ADD_CONFIG_FRAGMENTS=honk` 追加到兼容的 AArch64/x86_64 配置，或通过 `REMOVE_CONFIG_FRAGMENTS=honk` 移除。
+- `daed` 片段保留为可选项，选择 daed、luci-app-daede 和 eBPF/BTF 依赖，按需通过 `ADD_CONFIG_FRAGMENTS=daed` 使用。
 - IPQ60xx / IPQ807x 设备默认额外包含 `nss`。
 - 只有已显式选择 Dockerman 或明确适合运行 Docker 的设备默认包含 `docker_deps`，统一选择 `luci-app-dockerman`、`docker-compose` 及运行依赖，避免 NAND 空间紧张或无 USB 设备被默认加入 Docker 软件包。
 

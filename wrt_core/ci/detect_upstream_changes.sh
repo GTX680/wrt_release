@@ -16,7 +16,7 @@ MODELS=(
     S20-WIFI-YES
     S20-WIFI-NO
     jdcloud_ax6000_immwrt
-    jdcloud_ax6000_immwrt_daed
+    jdcloud_ax6000_immwrt_honk
 )
 
 read_ini_value() {

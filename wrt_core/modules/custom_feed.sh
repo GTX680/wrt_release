@@ -399,6 +399,14 @@ install_custom_feed() {
         required_feed_dirs+=(dae daed luci-app-daede vmlinux-btf)
     fi
 
+    if [[ ${HONK_PACKAGES_ENABLED:-0} == "1" ]]; then
+        custom_feed_sources+=(
+            "kwrum1/openwrt-honk|https://github.com/kwrum1/openwrt-honk.git|main|honk luci-app-honk"
+            "kenzok8/wall|https://github.com/kenzok8/wall.git|main|v2ray-geodata"
+        )
+        required_feed_dirs+=(honk luci-app-honk)
+    fi
+
     feeds_path=$(get_feeds_path)
     custom_feed_name=$(get_custom_feed_name)
     custom_feed_dir=$(get_custom_feed_source_dir)

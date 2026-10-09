@@ -38,7 +38,7 @@ jobs:
       - name: Keep Recent Upstream Markers
         run: |
           set -euo pipefail
-          for model in MEDIATEK-WIFI-YES MEDIATEK-WIFI-NO S20-WIFI-YES S20-WIFI-NO jdcloud_ax6000_immwrt jdcloud_ax6000_immwrt_daed; do
+          for model in MEDIATEK-WIFI-YES MEDIATEK-WIFI-NO S20-WIFI-YES S20-WIFI-NO jdcloud_ax6000_immwrt jdcloud_ax6000_immwrt_honk; do
             gh cache list --key "upstream-watch-$model-" --limit 100 --json key,createdAt | \
               jq -r 'sort_by(.createdAt) | reverse | .[5:] | .[].key' | \
               while read -r key; do
@@ -94,7 +94,7 @@ jobs:
       - name: Keep Recent Monitored Releases
         run: |
           set -euo pipefail
-          for model in MEDIATEK-WIFI-YES MEDIATEK-WIFI-NO S20-WIFI-YES S20-WIFI-NO jdcloud_ax6000_immwrt jdcloud_ax6000_immwrt_daed; do
+          for model in MEDIATEK-WIFI-YES MEDIATEK-WIFI-NO S20-WIFI-YES S20-WIFI-NO jdcloud_ax6000_immwrt jdcloud_ax6000_immwrt_honk; do
             gh release list --limit 100 --json tagName,publishedAt | \
               jq -r --arg suffix "_$model" 'sort_by(.publishedAt) | reverse | map(select(.tagName | endswith($suffix))) | .[2:] | .[].tagName' | \
               while read -r tag; do
