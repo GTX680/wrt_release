@@ -81,17 +81,16 @@ update_homeproxy() {
 fetch_lucky_release_index() {
     local directory_url="$1"
     local output_file="$2"
+    local index_url="${directory_url%/}/.lucky-browse.json"
     local cache_key
     cache_key="$(date +%s%N)-${RANDOM}"
 
-    # The CDN has served cached HTML for requests that ask for JSON even though
-    # the response varies on Accept. Use a unique directory query to reach the
-    # JSON representation instead of a previously cached browser page.
+    # Lucky serves directory JSON at a separate endpoint; Accept alone returns HTML.
     if ! curl_retry -fsSL \
         -H "Accept: application/json" \
         -H "Cache-Control: no-cache" \
         -o "$output_file" \
-        "${directory_url}?sort=namedirfirst&order=asc&_=${cache_key}"; then
+        "${index_url}?sort=namedirfirst&order=asc&_=${cache_key}"; then
         return 1
     fi
 
