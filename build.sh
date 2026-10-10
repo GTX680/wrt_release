@@ -208,6 +208,7 @@ REMOVE_CONFIG_FRAGMENT_LIST=()
 EFFECTIVE_CONFIG_FRAGMENTS=()
 DOCKER_STACK_PATCHES_ENABLED=0
 DAED_PACKAGES_ENABLED=0
+HONK_PACKAGES_ENABLED=0
 
 parse_fragment_csv() {
     local csv=$1
@@ -309,6 +310,12 @@ resolve_config_fragments() {
     else
         DAED_PACKAGES_ENABLED=0
     fi
+
+    if fragment_in_list "honk" "${EFFECTIVE_CONFIG_FRAGMENTS[@]}"; then
+        HONK_PACKAGES_ENABLED=1
+    else
+        HONK_PACKAGES_ENABLED=0
+    fi
 }
 
 print_config_fragment_summary() {
@@ -320,6 +327,7 @@ print_config_fragment_summary() {
     echo "  Effective fragments: $(join_fragments "${EFFECTIVE_CONFIG_FRAGMENTS[@]}")"
     echo "  Docker stack patches: $([[ $DOCKER_STACK_PATCHES_ENABLED == "1" ]] && echo enabled || echo skipped)"
     echo "  Daed packages: $([[ $DAED_PACKAGES_ENABLED == "1" ]] && echo enabled || echo skipped)"
+    echo "  Honk packages: $([[ $HONK_PACKAGES_ENABLED == "1" ]] && echo enabled || echo skipped)"
     if [[ -n $EXPECTED_KERNEL ]]; then
         echo "  Expected kernel: $EXPECTED_KERNEL"
     fi
@@ -586,6 +594,7 @@ fi
 
 DOCKER_STACK_PATCHES_ENABLED="$DOCKER_STACK_PATCHES_ENABLED" \
     DAED_PACKAGES_ENABLED="$DAED_PACKAGES_ENABLED" \
+    HONK_PACKAGES_ENABLED="$HONK_PACKAGES_ENABLED" \
     "$BASE_PATH/update.sh" "$REPO_URL" "$REPO_BRANCH" "$BUILD_DIR" "$COMMIT_HASH"
 
 # 机型 files 覆盖层：wrt_core/files/<机型名>/ → 构建树 files/
@@ -606,6 +615,7 @@ make defconfig
 verify_theme_config
 verify_apk_config
 verify_daed_config .config "$DAED_PACKAGES_ENABLED"
+verify_honk_config .config "$HONK_PACKAGES_ENABLED"
 
 if [[ $Build_Mod == "debug" ]]; then
     exit 0

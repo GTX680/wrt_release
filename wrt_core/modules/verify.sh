@@ -71,6 +71,9 @@ verify_custom_feed_installed_paths() {
     if [[ ${DAED_PACKAGES_ENABLED:-0} == "1" ]]; then
         required_package_dirs+=(dae daed luci-app-daede vmlinux-btf)
     fi
+    if [[ ${HONK_PACKAGES_ENABLED:-0} == "1" ]]; then
+        required_package_dirs+=(honk luci-app-honk)
+    fi
 
     custom_feed_name=$(get_custom_feed_name)
     custom_feed_package_dir=$(get_custom_feed_package_dir)
@@ -138,6 +141,47 @@ verify_daed_config() {
 
     if [[ ${#missing_symbols[@]} -ne 0 ]]; then
         printf 'Error: make defconfig dropped required daed/eBPF settings:\n' >&2
+        printf '  - %s\n' "${missing_symbols[@]}" >&2
+        return 1
+    fi
+}
+
+
+verify_honk_config() {
+    local config_path="$1"
+    local enabled="${2:-0}"
+    local symbol
+    local required_symbols=(
+        CONFIG_PACKAGE_honk=y
+        CONFIG_PACKAGE_luci-app-honk=y
+        CONFIG_PACKAGE_v2ray-geoip=y
+        CONFIG_PACKAGE_v2ray-geosite=y
+        CONFIG_BPF_TOOLCHAIN_HOST=y
+        CONFIG_KERNEL_DEBUG_INFO=y
+        CONFIG_KERNEL_DEBUG_INFO_BTF=y
+        CONFIG_KERNEL_BPF_EVENTS=y
+        CONFIG_KERNEL_CGROUPS=y
+        CONFIG_KERNEL_CGROUP_BPF=y
+        CONFIG_KERNEL_NET_NS=y
+        CONFIG_KERNEL_XDP_SOCKETS=y
+        CONFIG_PACKAGE_kmod-sched-core=y
+        CONFIG_PACKAGE_kmod-sched-bpf=y
+        CONFIG_PACKAGE_kmod-veth=y
+        CONFIG_PACKAGE_kmod-nft-queue=y
+        CONFIG_PACKAGE_kmod-xdp-sockets-diag=y
+        CONFIG_PACKAGE_ip-full=y
+    )
+    local missing_symbols=()
+
+    [[ $enabled == "1" ]] || return 0
+    for symbol in "${required_symbols[@]}"; do
+        if ! grep -qxF "$symbol" "$config_path"; then
+            missing_symbols+=("$symbol")
+        fi
+    done
+
+    if [[ ${#missing_symbols[@]} -ne 0 ]]; then
+        printf 'Error: make defconfig dropped required Honk/eBPF settings:\n' >&2
         printf '  - %s\n' "${missing_symbols[@]}" >&2
         return 1
     fi
