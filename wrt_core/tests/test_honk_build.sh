@@ -33,10 +33,10 @@ preview=$(cd "$REPO_ROOT" && ADD_CONFIG_FRAGMENTS=honk \
 grep -q 'Honk packages: enabled$' <<< "$preview"
 echo "PASS: Honk fragment can be added to an existing model"
 
-preview=$(cd "$REPO_ROOT" && bash <(sed 's/\r$//' build.sh) \
+preview=$(cd "$REPO_ROOT" && REMOVE_CONFIG_FRAGMENTS=honk bash <(sed 's/\r$//' build.sh) \
     jdcloud_ax6000_immwrt config_preview)
 grep -q 'Honk packages: skipped$' <<< "$preview"
-echo "PASS: existing AX6000 build remains unchanged"
+echo "PASS: removing Honk disables integration in the base AX6000 model"
 
 sed 's/\r$//' "$BASE_PATH/deconfig/fragments/honk.config" > "$test_dir/config"
 verify_honk_config "$test_dir/config" 1

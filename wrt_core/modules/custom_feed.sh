@@ -335,11 +335,154 @@ PY
 }
 
 
+sync_honk_packages_for_core_revision() {
+    local target_dir="$1"
+    local core_revision="$2"
+    local tmp_dir
+    local feed_revision
+    local matching_revision=""
+
+    tmp_dir=$(mktemp -d)
+    if ! curl_retry -fsSL -o "$tmp_dir/release-assets.json" \
+        https://api.github.com/repos/kenzok8/openwrt-honk/releases/tags/staging; then
+        echo "Error: failed to fetch Honk release asset inventory" >&2
+        rm -rf "$tmp_dir"
+        return 1
+    fi
+    # Keep history to find a complete package pair for the published core.
+    # The staging tag itself is old and does not track the generated assets.
+    if ! git_retry clone --filter=blob:none --sparse --no-checkout \
+        --single-branch -b main https://github.com/kenzok8/openwrt-honk.git "$tmp_dir/repo"; then
+        rm -rf "$tmp_dir"
+        return 1
+    fi
+
+    if ! git -C "$tmp_dir/repo" rev-list --first-parent HEAD > "$tmp_dir/revisions"; then
+        rm -rf "$tmp_dir"
+        return 1
+    fi
+    while IFS= read -r feed_revision; do
+        if git -C "$tmp_dir/repo" show "$feed_revision:honk/Makefile" 2>/dev/null | \
+            grep -Fxq "CORE_COMMIT:=$core_revision"; then
+            if ! git -C "$tmp_dir/repo" show "$feed_revision:luci-app-honk/Makefile" \
+                > "$tmp_dir/luci.mk" 2>/dev/null; then
+                continue
+            fi
+            # Rolling releases can also lag behind the pinned Doona UI archive.
+            if python3 - "$tmp_dir/luci.mk" "$tmp_dir/release-assets.json" <<'PY'
+import json
+import pathlib
+import re
+import sys
+
+makefile = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")
+release = json.loads(pathlib.Path(sys.argv[2]).read_text(encoding="utf-8"))
+source = re.search(r"^PKG_SOURCE:=(doona-[A-Za-z0-9_.-]+\.tar\.gz)$", makefile, re.MULTILINE)
+sha256 = re.search(r"^PKG_HASH:=([0-9a-f]{64})$", makefile, re.MULTILINE)
+url = re.search(
+    r"^PKG_SOURCE_URL:=https://github\.com/kenzok8/openwrt-honk/releases/download/staging/?$",
+    makefile, re.MULTILINE,
+)
+if source is None or sha256 is None or url is None:
+    raise SystemExit(1)
+for asset in release.get("assets", []):
+    if asset.get("name") == source[1] and asset.get("state") == "uploaded":
+        digest = asset.get("digest")
+        if digest is None or digest == f"sha256:{sha256[1]}":
+            raise SystemExit(0)
+raise SystemExit(1)
+PY
+            then
+                matching_revision="$feed_revision"
+                break
+            fi
+        fi
+    done < "$tmp_dir/revisions"
+
+    if [[ -z $matching_revision ]]; then
+        echo "Error: no Honk package snapshot matches published core $core_revision and available Doona assets" >&2
+        rm -rf "$tmp_dir"
+        return 1
+    fi
+    if ! git_retry -C "$tmp_dir/repo" sparse-checkout set honk luci-app-honk || \
+       ! git_retry -C "$tmp_dir/repo" checkout --detach "$matching_revision"; then
+        rm -rf "$tmp_dir"
+        return 1
+    fi
+    if [[ ! -f $tmp_dir/repo/honk/Makefile || ! -f $tmp_dir/repo/luci-app-honk/Makefile ]]; then
+        echo "Error: matching Honk snapshot lacks the required package pair" >&2
+        rm -rf "$tmp_dir"
+        return 1
+    fi
+
+    mkdir -p "$target_dir"
+    mv "$tmp_dir/repo/honk" "$tmp_dir/repo/luci-app-honk" "$target_dir/" || {
+        rm -rf "$tmp_dir"
+        return 1
+    }
+    rm -rf "$tmp_dir"
+    echo "Honk package snapshot: $matching_revision (core $core_revision)"
+}
+
+
+validate_honk_release_metadata() {
+    python3 - "$1" "$2" <<'PY'
+import json
+import pathlib
+import re
+import sys
+
+package_dir = pathlib.Path(sys.argv[1])
+metadata_dir = pathlib.Path(sys.argv[2])
+makefile = (package_dir / "Makefile").read_text(encoding="utf-8")
+revision = re.search(r"^CORE_COMMIT:=([0-9a-f]{40})\s*$", makefile, re.MULTILINE)
+if revision is None:
+    raise SystemExit("Error: Honk Makefile has no pinned CORE_COMMIT")
+revision = revision[1]
+
+provenance = json.loads((metadata_dir / "generated-provenance.json").read_text(encoding="utf-8"))
+core = provenance.get("core") if isinstance(provenance, dict) else None
+release_revision = core.get("commit") if isinstance(core, dict) else None
+if not isinstance(release_revision, str) or not re.fullmatch(r"[0-9a-f]{40}", release_revision):
+    raise SystemExit("Error: Honk release provenance has no valid core commit")
+
+stage = (metadata_dir / "generated-stage.mk").read_text(encoding="utf-8")
+assignments = {}
+for line in stage.splitlines():
+    if not line.strip() or line.startswith("#"):
+        continue
+    # Newer upstream builders include the asset download URL in this manifest.
+    if re.fullmatch(
+        r"PKG_SOURCE_URL:=https://github\.com/kenzok8/openwrt-honk/releases/download/[A-Za-z0-9_.-]+/?",
+        line,
+    ) and "PKG_SOURCE_URL" not in assignments:
+        assignments["PKG_SOURCE_URL"] = line.split(":=", 1)[1]
+        continue
+    match = re.fullmatch(r"(HONK_(?:ASSET|HASH)_(?:X86_64|AARCH64|ARMV7)):=(\S+)", line)
+    if match is None or match[1] in assignments:
+        raise SystemExit("Error: invalid Honk release stage manifest")
+    assignments[match[1]] = match[2]
+
+for arch, suffix in (("X86_64", "x86_64"), ("AARCH64", "aarch64"), ("ARMV7", "armv7")):
+    if assignments.get(f"HONK_ASSET_{arch}") != f"honk-core-{release_revision}-{suffix}.tar.gz":
+        raise SystemExit(f"Error: Honk {arch} release provenance does not match CORE_COMMIT")
+    if not re.fullmatch(r"[0-9a-f]{64}", assignments.get(f"HONK_HASH_{arch}", "")):
+        raise SystemExit(f"Error: Honk {arch} release has no valid SHA256")
+
+(metadata_dir / "core-revision").write_text(release_revision, encoding="ascii")
+if release_revision != revision:
+    print(f"Honk source core {revision} differs from published core {release_revision}", file=sys.stderr)
+    raise SystemExit(3)
+PY
+}
+
+
 prepare_honk_release() {
     local package_dir="$1"
     local release_url="https://github.com/kenzok8/openwrt-honk/releases/download/staging"
     local tmp_dir
     local filename
+    local validation_status
 
     tmp_dir=$(mktemp -d)
     # These generated build inputs are published as release assets, not in Git.
@@ -351,45 +494,34 @@ prepare_honk_release() {
         fi
     done
 
-    if ! python3 - "$package_dir" "$tmp_dir" <<'PY'
-import json
-import pathlib
-import re
-import shutil
-import sys
-
-package_dir = pathlib.Path(sys.argv[1])
-metadata_dir = pathlib.Path(sys.argv[2])
-makefile = (package_dir / "Makefile").read_text(encoding="utf-8")
-revision = re.search(r"^CORE_COMMIT:=([0-9a-f]{40})\s*$", makefile, re.MULTILINE)
-if revision is None:
-    raise SystemExit("Error: Honk Makefile has no pinned CORE_COMMIT")
-revision = revision[1]
-
-stage = (metadata_dir / "generated-stage.mk").read_text(encoding="utf-8")
-assignments = {}
-for line in stage.splitlines():
-    if not line.strip() or line.startswith("#"):
-        continue
-    match = re.fullmatch(r"(HONK_(?:ASSET|HASH)_(?:X86_64|AARCH64|ARMV7)):=(\S+)", line)
-    if match is None or match[1] in assignments:
-        raise SystemExit("Error: invalid Honk release stage manifest")
-    assignments[match[1]] = match[2]
-
-for arch, suffix in (("X86_64", "x86_64"), ("AARCH64", "aarch64"), ("ARMV7", "armv7")):
-    if assignments.get(f"HONK_ASSET_{arch}") != f"honk-core-{revision}-{suffix}.tar.gz":
-        raise SystemExit(f"Error: Honk {arch} release does not match CORE_COMMIT")
-    if not re.fullmatch(r"[0-9a-f]{64}", assignments.get(f"HONK_HASH_{arch}", "")):
-        raise SystemExit(f"Error: Honk {arch} release has no valid SHA256")
-
-provenance = json.loads((metadata_dir / "generated-provenance.json").read_text(encoding="utf-8"))
-if not isinstance(provenance, dict) or provenance.get("core", {}).get("commit") != revision:
-    raise SystemExit("Error: Honk release provenance does not match CORE_COMMIT")
-
-for filename in ("generated-stage.mk", "generated-provenance.json"):
-    shutil.copyfile(metadata_dir / filename, package_dir / filename)
-PY
-    then
+    if validate_honk_release_metadata "$package_dir" "$tmp_dir"; then
+        validation_status=0
+    else
+        validation_status=$?
+    fi
+    if [[ $validation_status == 3 ]]; then
+        echo "Honk main is ahead of the release; synchronizing packages for the published core..."
+        if ! sync_honk_packages_for_core_revision "$tmp_dir/feed" "$(cat "$tmp_dir/core-revision")" || \
+           ! validate_honk_release_metadata "$tmp_dir/feed/honk" "$tmp_dir"; then
+            rm -rf "$tmp_dir"
+            return 1
+        fi
+        for filename in generated-stage.mk generated-provenance.json; do
+            cp "$tmp_dir/$filename" "$tmp_dir/feed/honk/$filename" || {
+                rm -rf "$tmp_dir"
+                return 1
+            }
+        done
+        rm -rf "$package_dir" "$(dirname "$package_dir")/luci-app-honk"
+        if ! mv "$tmp_dir/feed/honk" "$package_dir" || \
+           ! mv "$tmp_dir/feed/luci-app-honk" "$(dirname "$package_dir")/luci-app-honk"; then
+            rm -rf "$tmp_dir"
+            return 1
+        fi
+    elif [[ $validation_status != 0 ]]; then
+        rm -rf "$tmp_dir"
+        return 1
+    elif ! cp "$tmp_dir/generated-stage.mk" "$tmp_dir/generated-provenance.json" "$package_dir/"; then
         rm -rf "$tmp_dir"
         return 1
     fi
