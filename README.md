@@ -80,7 +80,8 @@ GitHub Actions 的手动构建也提供 `add_fragments` 与 `remove_fragments` �
 
 - `MEDIATEK-WIFI-YES`
 - `MEDIATEK-WIFI-NO`
-- `S20-WIFI-YES`
+- `S20L-WIFI-YES`
+- `S20P-WIFI-YES`
 - `S20-WIFI-NO`
 - `jdcloud_ax6000_immwrt`
 - `jdcloud_ax6000_immwrt_honk`
@@ -92,7 +93,7 @@ GitHub Actions 的手动构建也提供 `add_fragments` 与 `remove_fragments` �
 - 监听配置沿用工作流的并发限制，避免过多大型多设备任务同时发布和写缓存。
 - Actions 缓存只保存 `.ccache`、host staging 和 toolchain staging，不保存目标 `build_dir`、目标 staging 或固件输出。
 - ccache 上限为 2 GiB；普通 Build 产物只保留 3 天。
-- `MEDIATEK-WIFI-YES/NO` 和 `S20-WIFI-YES/NO` 不再额外打包所有 kmod，避免在固件之外再次生成大型重复归档。
+- `MEDIATEK-WIFI-YES/NO` 和 S20 系列配置不再额外打包所有 kmod，避免在固件之外再次生成大型重复归档。
 - Release 上传后执行 `make clean` 并删除目标构建目录、目标 staging、`bin` 和临时发布目录，但保留可复用的 host/toolchain 缓存。
 - 监听配置各保留最近 2 个 Release；维护任务清理过期普通缓存和已完成的工作流记录，并为每个配置保留最近 5 个成功指纹标记。
 
@@ -106,7 +107,8 @@ GitHub Actions 的手动构建也提供 `add_fragments` 与 `remove_fragments` �
 | 京东云 | 雅典娜(02)、亚瑟(01)、太乙(07)、AX5(JDC版) - LiBwrt | `jdcloud_ipq60xx_libwrt` |
 | 京东云 | 百里 / AX6000 | `jdcloud_ax6000_immwrt` |
 | 京东云 | 百里 / AX6000 - Linux 6.18 / Honk | `jdcloud_ax6000_immwrt_honk` |
-| CLX | S20L、S20P（保留 WiFi） | `S20-WIFI-YES` |
+| CLX | S20L（AX4200 WiFi） | `S20L-WIFI-YES` |
+| CLX | S20P（AX6000 WiFi） | `S20P-WIFI-YES` |
 | CLX | S20L、S20M、S20P（移除 WiFi） | `S20-WIFI-NO` |
 | 阿里云 | AP8220 | `aliyun_ap8220_immwrt` |
 | 阿里云 | AP8220 - LiBwrt | `aliyun_ap8220_libwrt` |
@@ -132,7 +134,8 @@ GitHub Actions 的手动构建也提供 `add_fragments` 与 `remove_fragments` �
 ./build.sh jdcloud_ipq60xx_immwrt
 ./build.sh aliyun_ap8220_libwrt
 ./build.sh redmi_ax6_libwrt container
-./build.sh S20-WIFI-YES
+./build.sh S20L-WIFI-YES
+./build.sh S20P-WIFI-YES
 ./build.sh S20-WIFI-NO config_preview
 ./build.sh jdcloud_ax6000_immwrt_honk
 ```
@@ -146,7 +149,7 @@ GitHub Actions 的手动构建也提供 `add_fragments` 与 `remove_fragments` �
 
 不同设备会使用不同上游源码，例如 `VIKINGYFY/immortalwrt`、`immortalwrt/immortalwrt`、`LiBwrt/openwrt-6.x`、`padavanonly/immortalwrt-mt798x` 或本仓库维护的特定分支。`BUILD_TARGET_SDK` 未配置时，容器构建默认使用 `immortalwrt/sdk:openwrt-25.12`。
 
-`S20-WIFI-YES` 和 `S20-WIFI-NO` 均使用 `dqsq2e2/immortalwrt-mt798x-rebase` 的 `s20` 分支，分别构建 2 个保留 WiFi 的型号（S20L、S20P）和 3 个移除 WiFi 的型号（S20L、S20M、S20P）。
+`S20L-WIFI-YES`、`S20P-WIFI-YES` 和 `S20-WIFI-NO` 均使用 `chasey-dev/immortalwrt-mt798x-rebase` 的 `25.12` 分支。两个 WiFi 配置分别只构建 S20L（AX4200）和 S20P（AX6000），避免不同无线规格共用全局 SKU；无 WiFi 配置继续一次构建 S20L、S20M、S20P。三项配置均保留 `docker_deps,honk` 默认片段，并独立监听上游变更、记录成功构建标记和发布固件。
 
 `jdcloud_ax6000_immwrt_honk` 使用 `VIKINGYFY/immortalwrt` 的 `owrt` 分支，目标为 `jdcloud_re-cp-03`，通过 `EXPECTED_KERNEL=6.18` 检查内核主次版本，构建目录为 `immortalwrt-honk/`。原来的 `jdcloud_ax6000_immwrt` 继续使用 6.12 厂商驱动，两者独立保留。
 

@@ -13,7 +13,8 @@ on:
           - aliyun_ap8220_immwrt
           - aliyun_ap8220_libwrt
           - cmcc_rax3000m_immwrt
-          - S20-WIFI-YES
+          - S20L-WIFI-YES
+          - S20P-WIFI-YES
           - S20-WIFI-NO
           - gemtek_w1701k_immwrt
           - jdcloud_ax6000_immwrt
