@@ -138,12 +138,22 @@ with open(sys.argv[1], encoding="utf-8") as stream:
 
 candidates = [
     entry for entry in entries
-    if entry.get("is_dir") and re.fullmatch(r"v[0-9][0-9A-Za-z._-]*", entry.get("name", ""))
+    if entry.get("is_dir") and re.fullmatch(r"v[0-9]+(?:\.[0-9]+)+(?:[A-Za-z][0-9A-Za-z._-]*)?", entry.get("name", ""))
 ]
 if not candidates:
     raise SystemExit(1)
 
-latest = max(candidates, key=lambda entry: entry.get("mod_time", ""))
+def version_key(entry):
+    match = re.fullmatch(r"v([0-9]+(?:\.[0-9]+)+)(.*)", entry["name"])
+    numbers, suffix = match.groups()
+    suffix_key = tuple(
+        (1, int(part)) if part.isdigit() else (0, part.lower())
+        for part in re.findall(r"[0-9]+|[^0-9]+", suffix)
+    )
+    return tuple(map(int, numbers.split("."))), not suffix, suffix_key
+
+# Directory mtimes can change when old releases are repackaged.
+latest = max(candidates, key=version_key)
 print(latest["name"])
 PY
     ) || {
@@ -174,7 +184,10 @@ candidates = [
 if not candidates:
     raise SystemExit(1)
 
-latest = max(candidates, key=lambda entry: entry.get("mod_time", ""))
+latest = max(
+    candidates,
+    key=lambda entry: tuple(map(int, entry["name"].removesuffix("_wanji_docker").split("."))),
+)
 print(latest["name"])
 PY
     ) || {

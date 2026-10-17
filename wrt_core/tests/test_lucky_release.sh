@@ -8,6 +8,9 @@ test_dir=$(mktemp -d)
 trap 'rm -rf -- "$test_dir"' EXIT
 release_base=https://release.66666.host
 fixture_version=3.1.4
+fixture_older_version=3.1.3
+fixture_suffix=beta
+fixture_older_suffix=beta
 fixture_mode=normal
 
 # Model the live service: browser URLs return HTML, the browse endpoint returns JSON.
@@ -31,14 +34,14 @@ curl_retry() {
 
     case "$url" in
         "$release_base/.lucky-browse.json?"*)
-            printf '[{"name":"v3.1.3beta","is_dir":true,"mod_time":"2026-10-07T12:05:12Z"},{"name":"v%sbeta","is_dir":true,"mod_time":"2026-10-08T11:58:17Z"}]\n' \
-                "$fixture_version" > "$output_file"
+            printf '[{"name":"v2.27.2","is_dir":true,"mod_time":"2026-10-16T14:06:07Z"},{"name":"v%s%s","is_dir":true,"mod_time":"2026-10-15T12:05:12Z"},{"name":"v%s%s","is_dir":true,"mod_time":"2026-10-14T11:21:03Z"}]\n' \
+                "$fixture_older_version" "$fixture_older_suffix" "$fixture_version" "$fixture_suffix" > "$output_file"
             ;;
-        "$release_base/v${fixture_version}beta/.lucky-browse.json?"*)
-            printf '[{"name":"%s_wanji_docker","is_dir":true,"mod_time":"2026-10-08T11:55:17Z"}]\n' \
-                "$fixture_version" > "$output_file"
+        "$release_base/v${fixture_version}${fixture_suffix}/.lucky-browse.json?"*)
+            printf '[{"name":"%s_wanji_docker","is_dir":true,"mod_time":"2026-10-16T14:06:07Z"},{"name":"%s_wanji_docker","is_dir":true,"mod_time":"2026-10-14T11:21:03Z"}]\n' \
+                "$fixture_older_version" "$fixture_version" > "$output_file"
             ;;
-        "$release_base/v${fixture_version}beta/${fixture_version}_wanji_docker/.lucky-browse.json?"*)
+        "$release_base/v${fixture_version}${fixture_suffix}/${fixture_version}_wanji_docker/.lucky-browse.json?"*)
             if [[ $fixture_mode == missing-package ]]; then
                 printf '[{"name":"lucky_%s_Linux_arm64_wanji_docker.tar.gz","is_dir":false}]\n' \
                     "$fixture_version" > "$output_file"
@@ -62,12 +65,36 @@ resolved=$(resolve_latest_lucky_release)
 [[ $resolved == $'v3.1.4beta\t3.1.4_wanji_docker\t3.1.4' ]]
 [[ $(wc -l < "$test_dir/requests") == 5 ]]
 echo "PASS: all three release levels resolve the current wanji_docker package"
+echo "PASS: newer directory timestamps do not select older versions"
 
-fixture_version=3.2.0
+fixture_version=3.2.4
 resolved=$(resolve_latest_lucky_release)
-[[ $resolved == $'v3.2.0beta\t3.2.0_wanji_docker\t3.2.0' ]]
-fixture_version=3.1.4
+[[ $resolved == $'v3.2.4beta\t3.2.4_wanji_docker\t3.2.4' ]]
 echo "PASS: a newer release is discovered without a hard-coded version"
+
+fixture_version=3.10.0
+fixture_older_version=3.9.9
+resolved=$(resolve_latest_lucky_release)
+[[ $resolved == $'v3.10.0beta\t3.10.0_wanji_docker\t3.10.0' ]]
+echo "PASS: versions compare numerically instead of lexically"
+
+fixture_version=3.2.4
+fixture_older_version=3.2.4
+fixture_suffix=beta10
+fixture_older_suffix=beta9
+resolved=$(resolve_latest_lucky_release)
+[[ $resolved == $'v3.2.4beta10\t3.2.4_wanji_docker\t3.2.4' ]]
+echo "PASS: numbered beta releases compare numerically"
+
+fixture_suffix=""
+resolved=$(resolve_latest_lucky_release)
+[[ $resolved == $'v3.2.4\t3.2.4_wanji_docker\t3.2.4' ]]
+echo "PASS: a stable release takes precedence over its beta"
+
+fixture_version=3.1.4
+fixture_older_version=3.1.3
+fixture_suffix=beta
+fixture_older_suffix=beta
 
 fixture_mode=missing-package
 if resolve_latest_lucky_release > "$test_dir/output" 2> "$test_dir/error"; then
