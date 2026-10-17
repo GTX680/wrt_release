@@ -68,5 +68,8 @@ update_feeds() {
 
 install_feeds() {
     network_retry ./scripts/feeds update -i
-    ./scripts/feeds install -a -f
+    # Only custom packages may override core packages; install them first so
+    # duplicate packages in other feeds cannot take precedence.
+    ./scripts/feeds install -a -p "$(get_custom_feed_name)" -f
+    ./scripts/feeds install -a
 }

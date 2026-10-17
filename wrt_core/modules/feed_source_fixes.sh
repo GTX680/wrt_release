@@ -1,42 +1,6 @@
 #!/usr/bin/env bash
 # install_feeds 前的 feed 工作树修正。
 
-fix_miniupnpd_2311_patches() {
-    local package_dir="$BUILD_DIR/feeds/packages/net/miniupnpd"
-    [[ -f "$package_dir/Makefile" ]] || return 0
-
-    python3 - "$package_dir" "$BASE_PATH/patches/miniupnpd-2.3.11" <<'PY'
-from pathlib import Path
-import hashlib
-import re
-import sys
-
-package_dir, replacements = map(Path, sys.argv[1:])
-makefile = (package_dir / "Makefile").read_text()
-if not re.search(r"^PKG_VERSION:=2\.3\.11\s*$", makefile, re.MULTILINE):
-    raise SystemExit(0)
-
-# These backports are already included in 2.3.11. Match their contents so
-# updated feed patches are left alone when the upstream package catches up.
-obsolete = {
-    "020-descr-filter-fix.patch": "4e0f8ddf58cb130044a5f3b92bdf3a8859f8c15e0edbcbcb2b8df42f99e41da1",
-    "030-allow-private-fix.patch": "c667bfaa2f1028d1dc44547d4dd4302891799fc0de271a17618eff537b1a2339",
-}
-for name, expected in obsolete.items():
-    path = package_dir / "patches" / name
-    if path.is_file() and hashlib.sha256(path.read_bytes()).hexdigest() == expected:
-        path.unlink()
-        print(f"miniupnpd 2.3.11: removed merged backport {name}")
-
-logging_patch = package_dir / "patches/040-improve-logging.patch"
-if logging_patch.is_file() and hashlib.sha256(logging_patch.read_bytes()).hexdigest() == \
-        "aad6802ab9d01ecea2c143d7495644b714e171552434049f8669d4f28611bcba":
-    logging_patch.write_bytes((replacements / logging_patch.name).read_bytes())
-    print("miniupnpd 2.3.11: refreshed logging patch")
-PY
-}
-
-
 remove_unwanted_packages() {
     # 移除将由 custom_feed 接管或会产生冲突的上游包。
     local luci_packages=(
